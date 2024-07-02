@@ -1,0 +1,15 @@
+{
+  "name": "keyword-task-post",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@clickhouse/client": "^1.2.0",
+    "dataforseo-client": "^1.0.18"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

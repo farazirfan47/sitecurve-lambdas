@@ -1,0 +1,15 @@
+{
+  "name": "serp-post",
+  "version": "1.0.0",
+  "description": "lambda service for setting post tasks to dataforseo",
+  "main": "serp_post.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@clickhouse/client": "^1.2.0",
+    "dataforseo-client": "^1.0.18"
+  }
+}
