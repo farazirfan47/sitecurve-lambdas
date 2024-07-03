@@ -12,6 +12,9 @@ type KeywordArray = KeywordRow[];
 
 export const handler = async (event) => {
     try{
+
+        console.log('Received event:', JSON.stringify(event, null, 2));
+
         let keyword_ids: number[] = mergedKeywords(event);
         let ch_client = await initClickHouseClient();
         let batchFailed = false;
@@ -19,8 +22,7 @@ export const handler = async (event) => {
         let serpApi = new client.SerpApi("https://api.dataforseo.com", { fetch: createAuthenticatedFetch() });
         
         // Fetch keyword data from Clickhouse
-        const result = await getKeywords(ch_client, keyword_ids);
-        const rows: KeywordRow[] = await result.json();
+        const rows: KeywordRow[]  = await getKeywords(ch_client, keyword_ids);
     
         // Divide rows into chunks of 100 each
         const chunks: KeywordArray[] = [];
@@ -80,10 +82,10 @@ export const handler = async (event) => {
 const sendSerpTasks = async (serpApi: client.SerpApi, tasks: client.SerpTaskRequestInfo[], rateLimitRetry = 0) => {
     try{
         let response = await serpApi.googleOrganicTaskPost(tasks);
-        if(response.status_code == 20000){
+        if(response?.status_code == 20000){
             console.log("Tasks sent successfully");
             return true;
-        }else if (response.status_code == 40202){
+        }else if (response?.status_code == 40202){
             // sleep for 5 seconds and retry
             await new Promise(resolve => setTimeout(resolve, 5000));
             if(rateLimitRetry < 15){
@@ -92,7 +94,7 @@ const sendSerpTasks = async (serpApi: client.SerpApi, tasks: client.SerpTaskRequ
                 console.log("Rate limit exceeded.");
                 return false;
             }
-        }else if (response.status_code == 40200){
+        }else if (response?.status_code == 40200){
             console.log("Payment Required.");
             return false;
         }

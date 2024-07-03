@@ -23,5 +23,5 @@ export const getKeywords = async (client: ClickHouseClient, keyword_ids: number[
         query: `SELECT id, keyword FROM keywords WHERE id IN (${keyword_ids.join(',')})`,
         format: 'JSONEachRow',
     });
-    return result.json();
+    return await result.json();
 }

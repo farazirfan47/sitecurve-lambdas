@@ -35,6 +35,7 @@ export const handler = async (event) => {
         }
         
         let tasks: client.KeywordsDataTaskRequestInfo[] = [];
+
         // Loop through the chunks
         for (const chunk of chunks) {
             let keys: string[] = chunk.map(row => row.keyword);
@@ -45,6 +46,7 @@ export const handler = async (event) => {
             task.postback_data = "https://your.pingback.url";
             tasks.push(task);
             // 10 Tasks where every task will have 1000 keywords
+            // 1000 x 10 = 10k keywords handed by one lambda function
         }
 
         let resp = await sendKeywordDataTasks(keywordDataApi, tasks);
