@@ -8,13 +8,14 @@ import { APIGatewayEvent } from "aws-lambda";
 import * as zlib from "zlib";
 import { parseTags, sendToContentPraseQueue } from "./utils.js";
 import { ResultItem, SerpRow } from "./types.js";
-import { initClickHouseClient, saveSerps } from "./clickhouse.js";
+import { initMongoClient, saveInMongoDB } from "./mongodb.js";
+import { ObjectId } from "mongodb";
 
 export const handler = async (event: APIGatewayEvent) => {
   try {
     console.log("New SERP POSTBACK event");
-    let ch_client = await initClickHouseClient();
-
+    // let ch_client = await initClickHouseClient();
+    let mongoClient = await initMongoClient();
     // Extract the parts of the URL from the event object
     let serps: SerpRow[] = [];
 
@@ -41,6 +42,8 @@ export const handler = async (event: APIGatewayEvent) => {
                 let result = task?.result[0];
                 result.items.forEach((item: ResultItem) => {
                   let serp: SerpRow = {
+                    // Generate random mongo id for the record
+                    id: new ObjectId(),
                     landscape_id: tags.ls_id,
                     keyword_id: tags.id,
                     rank_group: result.rank_group,
@@ -54,7 +57,9 @@ export const handler = async (event: APIGatewayEvent) => {
                 });
                 // At this point we had 30 SERP rows ready in the serps array
                 // Save into ClickHouse
-                let savedSerps = await saveSerps(ch_client, serps, tags.id);
+                // let savedSerps = await saveSerps(ch_client, serps, tags.id);
+                // Save into MongoDB
+                let savedSerps = await saveInMongoDB(mongoClient, serps, tags.id);
                 // Send to OpenAI Queue
                 await sendToContentPraseQueue(savedSerps);
               }

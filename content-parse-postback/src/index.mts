@@ -1,24 +1,41 @@
+import AWS from "aws-sdk";
 import { APIGatewayEvent } from "aws-lambda";
-import { initClickHouseClient } from "./clickhouse.js";
-import { createAuthenticatedFetch } from "./dataforseo.js";
-import * as client from 'dataforseo-client'
+
+type ContentParseJob = {
+  id: string;
+  url: string;
+  page_id: string;
+};
 
 export const handler = async (event: APIGatewayEvent) => {
+  try {
+    console.log("New SERP POSTBACK event");
+    const qs = event.queryStringParameters;
 
-  console.log("New SERP POSTBACK event");
-  const qs = event.queryStringParameters;
-  let ch_client = await initClickHouseClient();
-  let onPageApi = new client.OnPageApi("https://api.dataforseo.com", { fetch: createAuthenticatedFetch() });
+    if (qs) {
+      const sqs = new AWS.SQS();
+      const params = {
+        QueueUrl: process.env.QUEUE_URL || "",
+        MessageBody: JSON.stringify({
+          id: qs.id,
+          url: qs.url,
+          page_id: qs.page_id,
+        } as ContentParseJob),
+      };
+      await sqs.sendMessage(params).promise();
+      console.log("Pingback URL pushed to SQS queue.");
+    }
 
-  if(qs){
-    let task = new client.OnPageContentParsingRequestInfo();
-    // task.url = qs.url;
-    task.id = qs.id;
-    let resp = await onPageApi.contentParsing([task]);
+    const response = {
+      statusCode: 200,
+      body: JSON.stringify("OK"),
+    };
+    return response;
+  } catch (e) {
+    console.error(e);
+    return {
+      statusCode: 500,
+      body: JSON.stringify("Internal Server Error"),
+    };
   }
-  const response = {
-    statusCode: 200,
-    body: JSON.stringify("Hello from Lambda!"),
-  };
-  return response;
 };

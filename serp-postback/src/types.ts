@@ -1,3 +1,5 @@
+import { ObjectId } from "mongodb";
+
 export type SerpRow = {
     landscape_id: string;
     keyword_id: string;
@@ -7,6 +9,7 @@ export type SerpRow = {
     description: string;
     url: string;
     breadcrumb: string;
+    id: ObjectId;
   };
   
 export type ResultItem = {
@@ -21,7 +24,7 @@ export type ResultItem = {
   }; 
   
   export type SerpTagJob = {
-    type: "keyword" | "serp",
+    // type: "keyword" | "serp",
     url: string,
     serp_id: string,
   };

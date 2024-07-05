@@ -14,7 +14,6 @@
     "typescript": "^5.5.3"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.2.0",
-    "dataforseo-client": "^1.0.18"
+    "aws-sdk": "^2.1654.0"
   }
 }

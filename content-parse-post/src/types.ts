@@ -1,5 +1,5 @@
 export type SerpJob = {
-    type: "keyword" | "serp",
+    // type: "keyword" | "serp",
     url: string,
     serp_id: string,
 };

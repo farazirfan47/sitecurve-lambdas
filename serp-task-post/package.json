@@ -9,7 +9,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@clickhouse/client": "^1.2.0",
-    "dataforseo-client": "^1.0.18"
+    "dataforseo-client": "^1.0.18",
+    "mongodb": "6.8"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^20.14.9",
+    "typescript": "^5.5.3"
   }
 }

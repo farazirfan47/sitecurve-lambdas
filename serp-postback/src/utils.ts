@@ -16,10 +16,10 @@ export const parseTags = (tag: string): Tag => {
 };
 
 export const sendToContentPraseQueue = async (serps: any) => {
-  let serpJobs: SerpTagJob[] = [];
+  let serpJob: SerpTagJob[] = [];
   for (let serp of serps) {
-    serpJobs.push({
-      type: "serp",
+    serpJob.push({
+      // type: "serp",
       url: serp.url,
       serp_id: serp.id,
     });
@@ -27,7 +27,7 @@ export const sendToContentPraseQueue = async (serps: any) => {
   const sqs = new AWS.SQS();
   const params = {
     QueueUrl: process.env.CONTENT_PARSE_QUEUE_URL || "",
-    MessageBody: JSON.stringify(serpJobs)
+    MessageBody: JSON.stringify(serpJob)
   };
   return await sqs.sendMessage(params).promise();
 }
