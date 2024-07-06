@@ -1,5 +1,5 @@
 export type KeywordRow = {
-  id: string;
+  _id: string;
   keyword: string;
 };
 

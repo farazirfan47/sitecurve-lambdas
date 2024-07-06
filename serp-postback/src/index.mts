@@ -14,7 +14,8 @@ import { ObjectId } from "mongodb";
 export const handler = async (event: APIGatewayEvent) => {
   try {
     console.log("New SERP POSTBACK event");
-    // let ch_client = await initClickHouseClient();
+    console.log("Received event:", event);
+
     let mongoClient = await initMongoClient();
     // Extract the parts of the URL from the event object
     let serps: SerpRow[] = [];
@@ -31,22 +32,23 @@ export const handler = async (event: APIGatewayEvent) => {
           .toString("utf-8");
         // Parse the decompressed JSON body
         const parsedBody = JSON.parse(decompressedBody);
+        console.log("Parsed body: ", JSON.stringify(parsedBody));
 
         if (parsedBody.status_code == 20000) {
           if (parsedBody.tasks_count > 0) {
             // We have some tasks
             for (let task of parsedBody.tasks) {
               // Tag has multiple values id=1234&ls_id=456 we will split them and save into their own variables
-              let tags = parseTags(task.tag);
+              let tags = parseTags(task.data.tag);
               if (task?.result_count > 0) {
                 let result = task?.result[0];
                 result.items.forEach((item: ResultItem) => {
                   let serp: SerpRow = {
                     // Generate random mongo id for the record
-                    id: new ObjectId(),
+                    _id: new ObjectId(),
                     landscape_id: tags.ls_id,
                     keyword_id: tags.id,
-                    rank_group: result.rank_group,
+                    rank_group: item.rank_group,
                     rank_absolute: item.rank_absolute,
                     title: item.title,
                     description: item.description,
@@ -60,8 +62,10 @@ export const handler = async (event: APIGatewayEvent) => {
                 // let savedSerps = await saveSerps(ch_client, serps, tags.id);
                 // Save into MongoDB
                 let savedSerps = await saveInMongoDB(mongoClient, serps, tags.id);
+                console.log("Saved SERP rows in MongoDB: ", savedSerps);
                 // Send to OpenAI Queue
                 await sendToContentPraseQueue(savedSerps);
+                console.log("Sent SERP rows to Content Parse Queue");
               }
             }
           }

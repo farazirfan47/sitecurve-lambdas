@@ -6,9 +6,13 @@ import { createAuthenticatedFetch } from "./dataforseo.js";
 import { initMongoClient, updateDomainStatuses } from "./mongodb.js";
 
 export const handler = async (event: SQSEvent) => {
+  console.log("New Content Parse Pingback received.");
   console.log("Received event:", JSON.stringify(event, null, 2));
+
   let mongoClient = await initMongoClient();
   let cpPingBacks: ContentParseJob[] = mergeContentPrasePingBack(event);
+  console.log("Merged Content Parse Pingbacks: ", cpPingBacks);
+
   let onPageApi = new client.OnPageApi("https://api.dataforseo.com", {
     fetch: createAuthenticatedFetch(),
   });
@@ -32,35 +36,54 @@ export const handler = async (event: SQSEvent) => {
         task.id = cpPingBack.id;
         task.limit = 1;
         // task.url = cpPingBack.url;
-        task.filters = [
-          ["resource_type","=","html"]
-        ];
+        task.filters = [["resource_type", "=", "html"]];
         tasks.push(task);
       });
       // Now we have 50 tasks loaded into the tasks array
       // let resp = await sendContentParsingApi(onPageApi, tasks);
-      let resp = await sendOnPagePageApi(onPageApi, tasks);
-      if (resp) {
-        resp.tasks?.forEach((task) => {
+      let resp: any = await sendOnPagePageApi(onPageApi, tasks);
+      if (resp?.tasks) {
+        for (let task of resp.tasks) {
+          // Fetch Serp ID from task data that will help update data in ClickHouse
+          let pingpackUrl = task?.data ? task.data.pingback_url : null;
+          // Get query string vars from pingback URL
+          let url = new URL(pingpackUrl);
+          let serpId = url.searchParams.get("page_id");
+          console.log("SERP ID: ", serpId);
+
+          console.log("Task: ", JSON.stringify(task));
+
           if (task?.status_code == 20000) {
             if (task.result_count && task.result_count > 0) {
               let result = task.result ? task.result[0] : null;
               if (result && result.items_count && result.items_count > 0) {
-                // Fetch Serp ID from task data that will help update data in ClickHouse
-                let pingpackUrl = task.data ? task.data.pingback_url : null;
-                // Get query string vars from pingback URL
-                let url = new URL(pingpackUrl);
-                let serpId = url.searchParams.get("page_id");
                 if (serpId) {
                   let item = result.items ? result.items[0] : null;
-                  if (item?.status_code == 20000) {
+                  if (item?.status_code == 200) {
                     parsedContent.push({
                       serp_id: serpId,
                       page_meta: item.meta,
+                      status: "DONE",
+                    });
+                  } else {
+                    // Update status in MongoDB
+                    parsedContent.push({
+                      serp_id: serpId,
+                      page_meta: {},
+                      status: "FAILED",
                     });
                   }
                 } else {
                   console.log("Failed to get serp_id from task data");
+                }
+              } else {
+                // Update status in MongoDB
+                if(serpId){
+                  parsedContent.push({
+                    serp_id: serpId,
+                    page_meta: {},
+                    status: "NO_CONTENT",
+                  });
                 }
               }
             }
@@ -68,15 +91,22 @@ export const handler = async (event: SQSEvent) => {
             // Console the error in detail for that specific task
             console.log("Failed to get task result");
             console.log(task);
+            if (serpId) {
+              parsedContent.push({
+                serp_id: serpId,
+                page_meta: {},
+                status: "FAILED",
+              });
+            }
           }
-        });
+        }
 
-        // Update these serp domain statuses in MongoDB
-        await updateDomainStatuses(mongoClient, parsedContent, "DONE");
+        console.log("Parsed Content: ", parsedContent);
+        // Update these serp domain statuses in MongoDB // 50 SERPS at a time
+        await updateDomainStatuses(mongoClient, parsedContent);
         // Put these serp ids in the OpenAI Queue for tragging
         // Parsed content will have 50 page contents
         await putSerpIdsInOpenAIQueue(parsedContent);
-        
       } else {
         console.log("Failed to send tasks to API. Exiting loop.");
         console.log("Failed chunk: ", i);
@@ -93,7 +123,6 @@ export const handler = async (event: SQSEvent) => {
   };
 };
 
-
 const sendOnPagePageApi = async (
   onPageApi: client.OnPageApi,
   tasks: client.OnPagePagesRequestInfo[],
@@ -103,6 +132,7 @@ const sendOnPagePageApi = async (
     let response = await onPageApi.pages(tasks);
     if (response?.status_code == 20000) {
       console.log("Tasks sent successfully");
+      console.log(JSON.stringify(response));
       return response;
     } else if (response?.status_code == 40202) {
       // sleep for 5 seconds and retry

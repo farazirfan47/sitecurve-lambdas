@@ -19,12 +19,24 @@ export const handler = async (event: SQSEvent) => {
     const openai = new OpenAI();
     const mongoClient = await initMongoClient();
     let mergedData = mergeBatchData(event.Records);
+    console.log("Merged data", mergedData);
 
-    let serpIds: string[] = mergedData.serp.map((item) => item.id);
-    let dbSerps = await fetchSerpsFromDb(mongoClient, serpIds);
-    console.log("Fetched serps from db", dbSerps);
+    let serpIds: string[] = [];
+    let dbSerps: any = [];
+    let combineJobs = [];
+    if (mergedData.serp) {
+      serpIds = mergedData.serp.map((item) => item.id);
+      dbSerps = await fetchSerpsFromDb(mongoClient, serpIds);
+      console.log("Fetched serps from db", dbSerps);
+    }
     // combine result will have db serps and keyword in a single array so that we can send parallel requests to openai, combine the dbSerps and mergedData.keyword arrays
-    let combineJobs = dbSerps.concat(mergedData.keyword);
+    if (mergedData.keyword) {
+      combineJobs = dbSerps.concat(mergedData.keyword);
+    } else {
+      combineJobs = dbSerps;
+    }
+
+    console.log("Combine jobs", combineJobs);
 
     let domainResults: DomainResult[] = [];
     let keywordResults: KeywordResult[] = [];
@@ -38,29 +50,29 @@ export const handler = async (event: SQSEvent) => {
             model: "gpt-3.5-turbo-instruct",
             prompt: prompt,
             temperature: 1,
-            max_tokens: 2000,
+            max_tokens: 500,
             top_p: 1,
             frequency_penalty: 0,
             presence_penalty: 0,
           });
-          console.log("Response", response.choices[0].text);
+          console.log("Response", response);
           // Convert the response to JSON
           let res = JSON.parse(response.choices[0].text);
-          keywordResults.push({ _id: job._id, res });
+          keywordResults.push({ _id: job.id, res });
         } else {
-          if (job.page_meta) {
+          if (job.content_parse_status != "NO_CONTENT" && job.page_meta) {
             let prompt = generateSerpPrompt(job.page_meta);
             console.log("Prompt", prompt);
             const response = await openai.completions.create({
               model: "gpt-3.5-turbo-instruct",
               prompt: prompt,
               temperature: 1,
-              max_tokens: 2000,
+              max_tokens: 500,
               top_p: 1,
               frequency_penalty: 0,
               presence_penalty: 0,
             });
-            console.log("Response", response.choices[0].text);
+            console.log("Response", response);
             // Convert the response to JSON
             let res = JSON.parse(response.choices[0].text);
             domainResults.push({ _id: job._id, res });
@@ -69,8 +81,12 @@ export const handler = async (event: SQSEvent) => {
       })
     );
     // Now we have domainResults and we will update the serps in the mongoDB in bulk
-    await tagSerpDomains(mongoClient, domainResults);
-    await saveTaggedKeywords(mongoClient, keywordResults);
+    if (domainResults.length > 0) {
+      await tagSerpDomains(mongoClient, domainResults);
+    }
+    if (keywordResults.length > 0) {
+      await saveTaggedKeywords(mongoClient, keywordResults);
+    }
 
     console.log("Completed tagging");
     return {

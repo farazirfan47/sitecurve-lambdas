@@ -1,7 +1,7 @@
 export const createAuthenticatedFetch = () => {
 
-    const username = 'username';
-    const password = 'password';
+    const username = process.env.DATAFORSEO_USERNAME;
+    const password = process.env.DATAFORSEO_PASSWORD;
 
     return (url: RequestInfo, init?: RequestInit): Promise<Response> => {
       const token = btoa(`${username}:${password}`);

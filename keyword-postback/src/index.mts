@@ -6,7 +6,7 @@ import { KeywordResult } from "./types.js";
 export const handler = async (event: APIGatewayEvent) => {
   try {
     console.log("New Keyword POSTBACK event");
-    console.log(event.body);
+    console.log("Event body", event.body);
 
     let mongoClient = await initMongoClient();
 
@@ -22,6 +22,7 @@ export const handler = async (event: APIGatewayEvent) => {
           .toString("utf-8");
         // Parse the decompressed JSON body
         const parsedBody = JSON.parse(decompressedBody);
+        console.log("Parsed body", JSON.stringify(parsedBody));
 
         if (parsedBody.status_code == 20000) {
           if (parsedBody.tasks_count > 0) {
@@ -30,7 +31,7 @@ export const handler = async (event: APIGatewayEvent) => {
                 let keywordResults: KeywordResult[] = [];
                 if (task?.result_count > 0) {
                   // Every task will have 500 keywords result that we set in the post request
-                  task.result.items.forEach((result: any) => {
+                  for (let result of task.result) {
                     let keywordResult: KeywordResult = {
                       search_volume: result.search_volume,
                       cpc: result.cpc,
@@ -42,11 +43,12 @@ export const handler = async (event: APIGatewayEvent) => {
                       keyword: result.keyword,
                     };
                     keywordResults.push(keywordResult);
-                  });
+                  }
                 }
                 // Now we have 500 keyword results
                 // Save into MongoDB
                 await saveInMongoDB(mongoClient, keywordResults, task.id);
+                console.log("Saved keyword results in MongoDB");
               })
             );
           }

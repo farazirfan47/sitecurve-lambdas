@@ -10,6 +10,8 @@ type ContentParseJob = {
 export const handler = async (event: APIGatewayEvent) => {
   try {
     console.log("New SERP POSTBACK event");
+    console.log("Event: ", event)
+
     const qs = event.queryStringParameters;
 
     if (qs) {
@@ -18,8 +20,8 @@ export const handler = async (event: APIGatewayEvent) => {
         QueueUrl: process.env.QUEUE_URL || "",
         MessageBody: JSON.stringify({
           id: qs.id,
-          url: qs.url,
-          page_id: qs.page_id,
+          url: qs.tag, // Tag is a URL
+          page_id: qs.page_id // page_id is a serp_id
         } as ContentParseJob),
       };
       await sqs.sendMessage(params).promise();

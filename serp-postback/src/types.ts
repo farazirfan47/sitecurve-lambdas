@@ -9,7 +9,7 @@ export type SerpRow = {
     description: string;
     url: string;
     breadcrumb: string;
-    id: ObjectId;
+    _id: ObjectId;
   };
   
 export type ResultItem = {

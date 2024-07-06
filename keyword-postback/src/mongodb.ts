@@ -26,7 +26,7 @@ export const saveInMongoDB = async (
   const bulkOps = keywordResults.map((keywordResult) => ({
     updateOne: {
       filter: {
-        task_id: taskId,
+        dfsTaskId: taskId,
         keyword: keywordResult.keyword,
       },
       update: {

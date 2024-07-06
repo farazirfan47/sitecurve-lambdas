@@ -1,4 +1,4 @@
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 
@@ -20,9 +20,20 @@ export const getKeywords = async (
 ): Promise<any> => {
   const db = client.db("sitecurve");
   const collection = db.collection("keywords");
-  return await collection
-    .find({ id: { $in: keyword_ids } }, { projection: { id: 1, keyword: 1 } })
+  const objectIdArray = keyword_ids.map((id) => new ObjectId(id));
+  let result = await collection
+    .find(
+      { _id: { $in: objectIdArray } },
+      { projection: { _id: 1, keyword: 1 } }
+    )
     .toArray();
+    // Convert _id to string
+  return result.map((row) => {
+    return {
+      _id: row._id.toString(),
+      keyword: row.keyword,
+    };
+  });
 };
 
 export const updateKeywordsStatus = async (
@@ -32,11 +43,14 @@ export const updateKeywordsStatus = async (
 ): Promise<void> => {
   const db = client.db("sitecurve");
   const collection = db.collection("keywords");
-  await Promise.all(
-    keywordIds.map(async (row) => {
-      await collection.updateOne({ id: row.id }, { $set: { status: status } });
-    })
-  );
+  const bulkOperations = keywordIds.map((row) => ({
+    updateOne: {
+      filter: { _id: new ObjectId(row._id) },
+      update: { $set: { status: status } },
+    },
+  }));
+  await collection.bulkWrite(bulkOperations);
+  console.log("Keywords status updated in MongoDB");
 };
 
 export const addTaskIdToKeywords = async (
@@ -46,9 +60,13 @@ export const addTaskIdToKeywords = async (
 ): Promise<void> => {
   const db = client.db("sitecurve");
   const collection = db.collection("keywords");
-  await Promise.all(
-    keywordIds.map(async (row) => {
-      await collection.updateOne({ id: row.id }, { $set: { dfsTaskId: taskId } });
-    })
-  );
+  // Update in bulk
+  const bulkOperations = keywordIds.map((keywordId) => ({
+    updateOne: {
+      filter: { _id: new ObjectId(keywordId) },
+      update: { $set: { dfsTaskId: taskId } },
+    },
+  }));
+  await collection.bulkWrite(bulkOperations);
+  console.log("Task ID added to keywords in MongoDB");
 };

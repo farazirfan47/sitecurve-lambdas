@@ -7,11 +7,13 @@ import * as client from 'dataforseo-client'
 
 export const handler = async (event: SQSEvent) => {
     try{
+
         console.log('Received event:', JSON.stringify(event, null, 2));
         let mongoClient = await initMongoClient();
         let serpJobs: SerpJob[] = mergedSerpBatch(event);
+        console.log("Merged Serp Jobs: ", serpJobs);
+
         let onPageApi = new client.OnPageApi("https://api.dataforseo.com", { fetch: createAuthenticatedFetch() });
-        let batchFailed = false;
     
         // Divide serpJobs into chunks of 100 each
         const chunks: SerpJob[][] = [];
@@ -28,6 +30,7 @@ export const handler = async (event: SQSEvent) => {
                 task.target = serpJob.url.replace(/(^\w+:|^)\/\//, '').replace('www.', '');
                 task.max_crawl_pages = 1;
                 task.start_url = serpJob.url;
+                task.enable_javascript = true;
                 task.force_sitewide_checks = true;
                 task.enable_content_parsing = true;
                 task.support_cookies = true;
@@ -67,6 +70,7 @@ const sendOnPageTasks = async (onPageApi: client.OnPageApi, tasks: client.OnPage
         let response = await onPageApi.taskPost(tasks);
         if(response?.status_code == 20000){
             console.log("Tasks sent successfully");
+            console.log(JSON.stringify(response));
             return true;
         }else if (response?.status_code == 40202){
             // sleep for 5 seconds and retry

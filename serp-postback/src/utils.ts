@@ -21,7 +21,7 @@ export const sendToContentPraseQueue = async (serps: any) => {
     serpJob.push({
       // type: "serp",
       url: serp.url,
-      serp_id: serp.id,
+      serp_id: serp._id.toString(),
     });
   }
   const sqs = new AWS.SQS();

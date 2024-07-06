@@ -2,6 +2,7 @@ import { createAuthenticatedFetch } from "./dataforseo.js";
 import {
   divideAndGroupValues,
   generateKeywordIds,
+  generateKeywordIdsForTaskresponse,
   mergedKeywords,
   openAIHundredKeywordChunks,
   putChunkstoOpenAI,
@@ -18,8 +19,12 @@ import { KeywordRow } from "./types.js";
 
 export const handler = async (event: SQSEvent) => {
   try {
+
+    console.log("Received event:", event);
+
     let keyword_ids: number[] = mergedKeywords(event);
-    // let ch_client = await initClickHouseClient();
+    console.log("Keyword IDs: ", keyword_ids);
+
     let mongoClient = await initMongoClient();
 
     let keywordDataApi = new client.KeywordsDataApi(
@@ -31,11 +36,14 @@ export const handler = async (event: SQSEvent) => {
     // const result = await getKeywords(ch_client, keyword_ids);
     // const rows: KeywordRow[] = await result.json();
     const rows: KeywordRow[] = await getKeywords(mongoClient, keyword_ids);
+    console.log("Mongo DB Keyword Rows: ", rows);
     // Divide single chunk into chunks of 100 each
     let hundredKeywordChunks = openAIHundredKeywordChunks(rows, 50);
+    console.log("Hundred Keyword Chunks: ", hundredKeywordChunks);
     await putChunkstoOpenAI(hundredKeywordChunks);
     // Chunks where each array will have 100 chunks and each chunk will have 500 keywords
     let chunkGroups = divideAndGroupValues(rows, 500, 100);
+    console.log("Chunk Groups: ", chunkGroups);
 
     await Promise.all(
       chunkGroups.map(async (hundredChunks) => {
@@ -44,28 +52,33 @@ export const handler = async (event: SQSEvent) => {
         hundredChunks.forEach((singleChunk) => {
           let keys: string[] = singleChunk.map((row) => row.keyword);
           let task = new client.KeywordsDataTaskRequestInfo();
-          task.location_code = 2840;
+          task.location_code = 2840; // USA
           task.language_code = "en";
           task.keywords = keys;
-          task.postback_data =
-            "https://uo1apvg9ib.execute-api.us-east-2.amazonaws.com/default/keyword-postback";
+          task.postback_url = "https://uo1apvg9ib.execute-api.us-east-2.amazonaws.com/default/keyword-postback";
           tasks.push(task);
           // Every task will have 500 keywords
         });
         let resp = await sendKeywordDataTasks(keywordDataApi, tasks);
         if (!resp) {
           console.log("Task Failed");
+          // All Tasks have failed means 100x1000 = 10000 keywords
           let keywordIds = generateKeywordIds(hundredChunks, rows);
           await updateKeywordsStatus(mongoClient, keywordIds, "FAILED");
         } else {
-          resp?.tasks?.forEach(async (task, index) => {
-            if (task?.status_code == 20000) {
-              let keywordIds = generateKeywordIds(hundredChunks, rows);
-              if (task.id) {
-                await addTaskIdToKeywords(mongoClient, keywordIds, task.id);
+          if(resp?.tasks){
+            for(let task of resp.tasks) {
+              if (task?.status_code == 20100) {
+                console.log("Inisde 20100");
+                let keywordIds = generateKeywordIdsForTaskresponse([task?.data?.keywords], rows);
+                console.log("Keyword IDs: ", keywordIds);
+                if (task.id) {
+                  await addTaskIdToKeywords(mongoClient, keywordIds, task.id);
+                  console.log("Task ID added to keywords");
+                }
               }
-            }
-          });
+            };
+          }
         }
       })
     );
@@ -91,6 +104,7 @@ const sendKeywordDataTasks = async (
     let response = await keywordDataApi.googleAdsSearchVolumeTaskPost(tasks);
     if (response?.status_code == 20000) {
       console.log("Tasks sent successfully");
+      console.log(response);
       return response;
     } else if (response?.status_code == 40202) {
       // sleep for 5 seconds and retry

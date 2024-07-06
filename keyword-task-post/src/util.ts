@@ -49,11 +49,28 @@ export const generateKeywordIds = (
   let keywordIds: string[] = [];
   let keywordMap: any = {};
   allKeywords.forEach((row) => {
-    keywordMap[row.keyword] = row.id;
+    keywordMap[row.keyword] = row._id;
   });
   hundredChunks.forEach((singleChunk) => {
     singleChunk.forEach((row) => {
       keywordIds.push(keywordMap[row.keyword]);
+    });
+  });
+  return keywordIds;
+};
+
+export const generateKeywordIdsForTaskresponse = (
+  hundredChunks: string[][],
+  allKeywords: KeywordRow[]
+) => {
+  let keywordIds: string[] = [];
+  let keywordMap: any = {};
+  allKeywords.forEach((row) => {
+    keywordMap[row.keyword] = row._id;
+  });
+  hundredChunks.forEach((singleChunk) => {
+    singleChunk.forEach((row) => {
+      keywordIds.push(keywordMap[row]);
     });
   });
   return keywordIds;
@@ -70,19 +87,20 @@ export const openAIHundredKeywordChunks = (
 export const putChunkstoOpenAI = async (chunks: KeywordArray[]) => {
   // 100 keyword in each job
   const sqs = new AWS.SQS();
-  chunks.forEach(async (chunk) => {
+  for (const chunk of chunks) {
     let keywords: any = [];
-    chunk.forEach(async (item) => {
+    chunk.forEach((item) => {
       keywords.push({
-        id: item.id,
+        id: item._id,
         keyword: item.keyword,
         type: "keyword",
       });
     });
     const params = {
       MessageBody: JSON.stringify(keywords),
-      QueueUrl: process.env.OPENAI_QUEUE_URL || "",
+      QueueUrl: process.env.OPENAI_QUEUE || "",
     };
     await sqs.sendMessage(params).promise();
-  });
+    console.log("Chunk sent to OpenAI");
+  }
 };
