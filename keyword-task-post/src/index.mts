@@ -38,18 +38,18 @@ export const handler = async (event: SQSEvent) => {
     const rows: KeywordRow[] = await getKeywords(mongoClient, keyword_ids);
     console.log("Mongo DB Keyword Rows: ", rows);
     // Divide single chunk into chunks of 100 each
-    let hundredKeywordChunks = openAIHundredKeywordChunks(rows, 50);
+    let hundredKeywordChunks = openAIHundredKeywordChunks(rows, 10);
     console.log("Hundred Keyword Chunks: ", hundredKeywordChunks);
     await putChunkstoOpenAI(hundredKeywordChunks);
     // Chunks where each array will have 100 chunks and each chunk will have 500 keywords
-    let chunkGroups = divideAndGroupValues(rows, 500, 100);
+    let chunkGroups = divideAndGroupValues(rows, 200, 50);
     console.log("Chunk Groups: ", chunkGroups);
 
     await Promise.all(
       chunkGroups.map(async (hundredChunks) => {
         // We got 100 chunks where chunk will have 500 keywords
         let tasks: client.KeywordsDataTaskRequestInfo[] = [];
-        hundredChunks.forEach((singleChunk) => {
+        for(let singleChunk of hundredChunks) {
           let keys: string[] = singleChunk.map((row) => row.keyword);
           let task = new client.KeywordsDataTaskRequestInfo();
           task.location_code = 2840; // USA
@@ -58,7 +58,7 @@ export const handler = async (event: SQSEvent) => {
           task.postback_url = "https://uo1apvg9ib.execute-api.us-east-2.amazonaws.com/default/keyword-postback";
           tasks.push(task);
           // Every task will have 500 keywords
-        });
+        }
         let resp = await sendKeywordDataTasks(keywordDataApi, tasks);
         if (!resp) {
           console.log("Task Failed");

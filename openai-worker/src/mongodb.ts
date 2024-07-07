@@ -4,15 +4,41 @@ const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 
 export const initMongoClient = async (): Promise<MongoClient> => {
   try {
-    const client = new MongoClient(uri);
-    await client.connect();
-    console.log("MongoDB connected");
-    return client;
+    const client = await connectWithRetry();
+    if (client) {
+      return client;
+    } else {
+      throw new Error("MongoDB connection failed");
+    }
   } catch (e) {
     console.error("MongoDB connection failed");
     throw e;
   }
 };
+
+async function connectWithRetry() {
+  let attempts = 0;
+  const maxRetries = 5;
+
+  while (attempts < maxRetries) {
+    try {
+      const client = new MongoClient(uri, {
+        tls: true,
+        tlsAllowInvalidCertificates: true,
+      });
+      await client.connect();
+      console.log("Connected successfully to server");
+      return client;
+    } catch (err) {
+      console.error(`Connection attempt ${attempts + 1} failed:`, err);
+      attempts++;
+      if (attempts >= maxRetries) {
+        throw new Error("Exceeded maximum retry attempts");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
+    }
+  }
+}
 
 export const fetchSerpsFromDb = async (
   client: MongoClient,

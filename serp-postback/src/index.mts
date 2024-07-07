@@ -73,6 +73,7 @@ export const handler = async (event: APIGatewayEvent) => {
       }
     }
 
+    await mongoClient.close();
     const response = {
       statusCode: 200,
       body: JSON.stringify("Serp Postback Succeeded!"),

@@ -89,13 +89,13 @@ export const putChunkstoOpenAI = async (chunks: KeywordArray[]) => {
   const sqs = new AWS.SQS();
   for (const chunk of chunks) {
     let keywords: any = [];
-    chunk.forEach((item) => {
+    for (let item of chunk) {
       keywords.push({
         id: item._id,
         keyword: item.keyword,
         type: "keyword",
       });
-    });
+    }
     const params = {
       MessageBody: JSON.stringify(keywords),
       QueueUrl: process.env.OPENAI_QUEUE || "",
